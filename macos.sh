@@ -21,7 +21,7 @@ brew update && brew upgrade
 # 2. PACOTES BASE
 # =============================================================================
 echo "\n🔧 Instalando pacotes base..."
-brew install git neovim zsh jq curl wget
+brew install git neovim zsh jq curl wget starship
 
 # =============================================================================
 # 3. NODE LTS via NVM
@@ -86,10 +86,10 @@ brew install --cask font-jetbrains-mono-nerd-font
 brew install --cask font-fira-code-nerd-font
 
 # =============================================================================
-# 9. TERMINAL — iTerm2
+# 9. TERMINAL — Kitty
 # =============================================================================
-echo "\n💻 Instalando iTerm2..."
-brew install --cask iterm2
+echo "\n💻 Instalando Kitty..."
+brew install --cask kitty
 
 # =============================================================================
 # 10. FIREFOX
@@ -105,12 +105,6 @@ if [ ! -d "$HOME/.oh-my-zsh" ]; then
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 fi
 
-# Spaceship theme
-if [ ! -d "$HOME/.oh-my-zsh/custom/themes/spaceship-prompt" ]; then
-  git clone https://github.com/spaceship-prompt/spaceship-prompt "$HOME/.oh-my-zsh/custom/themes/spaceship-prompt"
-  ln -sf "$HOME/.oh-my-zsh/custom/themes/spaceship-prompt/spaceship.zsh-theme" "$HOME/.oh-my-zsh/custom/themes/spaceship.zsh-theme"
-fi
-
 # Plugins
 git clone https://github.com/zsh-users/zsh-autosuggestions "$HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions" 2>/dev/null || true
 git clone https://github.com/SlavaYakovenko/zsh-databricks "$HOME/.oh-my-zsh/custom/plugins/databricks" 2>/dev/null || true
@@ -122,17 +116,13 @@ echo "\n📝 Configurando .zshrc..."
 cp ~/.zshrc ~/.zshrc.backup 2>/dev/null || true
 
 cat > ~/.zshrc << 'EOF'
-# Path to your oh-my-zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 
-ZSH_THEME="spaceship"
+ZSH_THEME=""
 
 plugins=(git battery azure databricks zsh-autosuggestions zsh-syntax-highlighting)
 
 source $ZSH/oh-my-zsh.sh
-
-SPACESHIP_GCLOUD_SYMBOL="󰊭 "
-SPACESHIP_AZURE_SYMBOL="󰠅 "
 
 # Aliases
 alias cls="clear"
@@ -165,23 +155,133 @@ if [ -f '/Users/gustavoueti/google-cloud-sdk/completion.zsh.inc' ]; then
   source '/Users/gustavoueti/google-cloud-sdk/completion.zsh.inc'
 fi
 
-# Segmento customizado do Databricks
-spaceship_databricks() {
-  local profile
-  profile=$(grep "default_profile" ~/.databrickscfg 2>/dev/null | awk -F'= ' '{print $2}' | tr -d ' ')
-  [[ -z "$profile" ]] && profile="DEFAULT"
-  spaceship::section --color "#FF6B35" --prefix "using " "⬡ $profile "
-}
+# Starship
+eval "$(starship init zsh)"
+EOF
 
-# Ordem do prompt
-SPACESHIP_PROMPT_ORDER=(
-  dir
-  git
-  databricks
-  azure
-  line_sep
-  char
-)
+# =============================================================================
+# 13. STARSHIP CONFIG
+# =============================================================================
+echo "\n⭐ Configurando Starship..."
+mkdir -p ~/.config
+
+cat > ~/.config/starship.toml << 'EOF'
+# =============================================================================
+# Starship — Tokyo Night theme — Gustavo Ueti
+# =============================================================================
+
+format = """
+$time\
+$directory\
+$git_branch\
+$git_status\
+$custom\
+$azure\
+$line_break\
+$character"""
+
+[time]
+disabled = false
+format = '[$time]($style) '
+time_format = "%H:%M"
+style = "fg:#565f89"
+
+[directory]
+format = '[ $path]($style)[$read_only]($read_only_style) '
+style = "fg:#7aa2f7 bold"
+read_only = " 󰌾"
+read_only_style = "fg:#f7768e"
+truncation_length = 3
+truncate_to_repo = true
+
+[git_branch]
+format = '[on](fg:#565f89) [ $branch]($style) '
+style = "fg:#bb9af7 bold"
+symbol = ""
+
+[git_status]
+format = '([$all_status$ahead_behind]($style) )'
+style = "fg:#e0af68"
+conflicted = "󰩌 "
+ahead = "⇡${count} "
+behind = "⇣${count} "
+diverged = "⇕⇡${ahead_count}⇣${behind_count} "
+untracked = "? "
+stashed = " "
+modified = "! "
+staged = "+ "
+renamed = "» "
+deleted = "✘ "
+up_to_date = "[✓](fg:#9ece6a) "
+
+[custom.databricks]
+command = "grep 'default_profile' /Users/gustavoueti/.databrickscfg | awk -F' = ' '{print $2}'"
+when = "test -f /Users/gustavoueti/.databrickscfg"
+format = '[via](fg:#565f89) [⬡ $output]($style) '
+style = "fg:#FF6B35 bold"
+shell = ["zsh", "-c"]
+use_stdin = false
+
+[azure]
+disabled = false
+format = '[on](fg:#565f89) [󰠅 $subscription]($style) '
+style = "fg:#7dcfff bold"
+symbol = "󰠅 "
+
+[character]
+success_symbol = "[❯](bold fg:#9ece6a)"
+error_symbol = "[❯](bold fg:#f7768e)"
+vimcmd_symbol = "[❮](bold fg:#bb9af7)"
+
+[package]
+disabled = true
+
+[nodejs]
+disabled = true
+
+[python]
+disabled = true
+
+[java]
+disabled = true
+
+[aws]
+disabled = true
+
+[gcloud]
+disabled = true
+EOF
+
+# =============================================================================
+# 14. KITTY CONFIG
+# =============================================================================
+echo "\n🐱 Configurando Kitty..."
+mkdir -p ~/.config/kitty
+
+# Tokyo Night Moon theme
+git clone https://github.com/kovidgoyal/kitty-themes.git /tmp/kitty-themes 2>/dev/null || true
+cp /tmp/kitty-themes/themes/tokyo_night_moon.conf ~/.config/kitty/tokyo-night.conf
+
+cat > ~/.config/kitty/kitty.conf << 'EOF'
+font_family JetBrainsMono Nerd Font
+font_size 12.0
+shell zsh
+include tokyo-night.conf
+
+hide_window_decorations titlebar-only
+background_opacity 0.97
+
+enabled_layouts splits
+
+# splits
+map cmd+enter launch --location=vsplit
+map shift+cmd+enter launch --location=hsplit
+
+# navegação entre painéis
+map cmd+left neighboring_window left
+map cmd+right neighboring_window right
+map cmd+up neighboring_window up
+map cmd+down neighboring_window down
 EOF
 
 # =============================================================================
@@ -191,5 +291,5 @@ echo "\n🐚 Definindo zsh como shell padrão..."
 chsh -s $(which zsh)
 
 echo "\n✅ Setup macOS concluído!"
-echo "👉 Abra o iTerm2, configure a fonte para 'JetBrainsMono Nerd Font' em Preferences > Profiles > Text > Font"
+echo "👉 Abra o Kitty — fonte e tema já configurados"
 echo "👉 Rode: source ~/.zshrc"
