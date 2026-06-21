@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# ubuntu26.sh ó Setup completo de ambiente dev ó Gustavo Ueti
+# wsl2-ubuntu.sh / Setup completo de ambiente dev / Gustavo Ueti
 # Alvo: WSL2 / Ubuntu 26.04 (ou qualquer Ubuntu recente com glibc 2.34+)
 #
 # Uso:
@@ -10,55 +10,55 @@
 # Idempotente: pode rodar de novo sem duplicar nada (checa antes de instalar).
 # =============================================================================
 set -e
- 
+
 echo "==> Atualizando apt"
 sudo apt update
 sudo apt upgrade -y
- 
+
 # -----------------------------------------------------------------------------
-# DependÍncias base
+# Depend√™ncias base
 # -----------------------------------------------------------------------------
-echo "==> Instalando dependÍncias base"
+echo "==> Instalando depend√™ncias base"
 sudo apt install -y \
-  git curl wget unzip gpg xclip \
+  git curl wget unzip gpg xclip wl-clipboard dos2unix \
   build-essential gcc make \
   python3-pip python3-venv npm
- 
+
 # -----------------------------------------------------------------------------
 # Libs de build para compilar Python via asdf (python-build)
-# Sem isso, extensıes nativas (bz2, sqlite3, ctypes, lzma, readline, tkinter)
-# ficam faltando e o bin·rio compilado fica capado (ModuleNotFoundError).
+# Sem isso, extens√µes nativas (bz2, sqlite3, ctypes, lzma, readline, tkinter)
+# ficam faltando e o bin√°rio compilado fica capado (ModuleNotFoundError).
 # -----------------------------------------------------------------------------
-echo "==> Instalando libs de build para compilaÁ„o de Python (asdf)"
+echo "==> Instalando libs de build para compila√ß√£o de Python (asdf)"
 sudo apt install -y \
   libssl-dev zlib1g-dev libbz2-dev \
   libreadline-dev libsqlite3-dev libncursesw5-dev libffi-dev \
   liblzma-dev tk-dev xz-utils
- 
+
 # -----------------------------------------------------------------------------
-# zsh + Oh My Zsh (sÛ pra plugins ó tema È via Starship, n„o via OMZ theme)
+# zsh + Oh My Zsh (s√≥ pra plugins ‚Äî tema √© via Starship, n√£o via OMZ theme)
 # -----------------------------------------------------------------------------
 echo "==> Instalando zsh + Oh My Zsh"
 sudo apt install -y zsh
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 fi
- 
+
 echo "==> Instalando plugins zsh-autosuggestions e zsh-syntax-highlighting"
 ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 [ -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] || \
   git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
 [ -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ] || \
   git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
- 
+
 # -----------------------------------------------------------------------------
-# Starship (tema Tokyo Night Moon + mÛdulos Databricks/Azure)
+# Starship (tema Tokyo Night Moon + m√≥dulos Databricks/Azure)
 # -----------------------------------------------------------------------------
 echo "==> Instalando Starship"
 if ! command -v starship &> /dev/null; then
   curl -sS https://starship.rs/install.sh | sh -s -- -y
 fi
- 
+
 # -----------------------------------------------------------------------------
 # eza (ls moderno) + bat (cat moderno)
 # -----------------------------------------------------------------------------
@@ -71,51 +71,51 @@ if ! command -v eza &> /dev/null; then
   sudo apt update
   sudo apt install -y eza
 fi
- 
+
 echo "==> Instalando bat"
 sudo apt install -y bat
- 
+
 # -----------------------------------------------------------------------------
 # tmux
 # -----------------------------------------------------------------------------
 echo "==> Instalando tmux"
 sudo apt install -y tmux
- 
+
 # -----------------------------------------------------------------------------
-# Rust (rustup) ó usado por plugins do LunarVim (telescope-fzf-native, etc)
-# e por ferramentas de formataÁ„o/busca que rodam via cargo install.
+# Rust (rustup) ‚Äî usado por plugins do LunarVim (telescope-fzf-native, etc)
+# e por ferramentas de formata√ß√£o/busca que rodam via cargo install.
 # -----------------------------------------------------------------------------
 echo "==> Instalando Rust via rustup"
 if ! command -v rustc &> /dev/null; then
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 fi
 source "$HOME/.cargo/env"
- 
+
 echo "==> Instalando ferramentas cargo usadas pelo LunarVim"
 # stylua: formatter de Lua (usado pelo conform/null-ls do lvim)
 command -v stylua &> /dev/null || cargo install stylua
 # fd-find e ripgrep: usados pelo Telescope (fuzzy finder) para busca de arquivos/texto
 command -v fd &> /dev/null || cargo install fd-find
 command -v rg &> /dev/null || cargo install ripgrep
-# tree-sitter-cli: necess·rio para :TSInstall / parsers do treesitter
+# tree-sitter-cli: necess√°rio para :TSInstall / parsers do treesitter
 command -v tree-sitter &> /dev/null || cargo install tree-sitter-cli
- 
+
 # -----------------------------------------------------------------------------
 # Neovim + LunarVim
 # -----------------------------------------------------------------------------
 echo "==> Instalando Neovim"
 sudo apt install -y neovim
- 
+
 NVIM_VERSION=$(nvim --version | head -1 | grep -oP '\d+\.\d+' | head -1)
 echo "    Neovim version: $NVIM_VERSION"
- 
+
 echo "==> Instalando LunarVim"
 if ! command -v lvim &> /dev/null; then
   LV_BRANCH='release-1.4/neovim-0.9' bash <(curl -s https://raw.githubusercontent.com/lunarvim/lunarvim/release-1.4/neovim-0.9/utils/installer/install.sh) --yes
 fi
- 
+
 # -----------------------------------------------------------------------------
-# asdf (version manager) ó instalado como bin·rio Go (formato atual, 2.x+)
+# asdf (version manager) ‚Äî instalado como bin√°rio Go (formato atual, 2.x+)
 # -----------------------------------------------------------------------------
 echo "==> Instalando asdf"
 if [ ! -f "$HOME/bin/asdf" ]; then
@@ -126,9 +126,12 @@ if [ ! -f "$HOME/bin/asdf" ]; then
   chmod +x "$HOME/bin/asdf"
 fi
 export PATH="$HOME/bin:$PATH"
- 
+
 # -----------------------------------------------------------------------------
 # Git Credential Manager (GCM)
+# OBS: 'secretservice' e 'dpapi' N√ÉO funcionam dentro do WSL (exigem interface
+# gr√°fica Linux ou Windows nativo, respectivamente). Usamos 'cache' ‚Äî guarda a
+# credencial em mem√≥ria por um tempo, sem precisar reautenticar a cada comando.
 # -----------------------------------------------------------------------------
 echo "==> Instalando Git Credential Manager"
 if ! command -v git-credential-manager &> /dev/null; then
@@ -137,8 +140,16 @@ if ! command -v git-credential-manager &> /dev/null; then
   sudo dpkg -i /tmp/gcm.deb
   git-credential-manager configure
 fi
-git config --global credential.credentialStore secretservice
- 
+git config --global credential.credentialStore cache
+git config --global credential.cache.timeout 28800
+
+# -----------------------------------------------------------------------------
+# Git ‚Äî identidade global
+# -----------------------------------------------------------------------------
+echo "==> Configurando git user.name / user.email"
+git config --global user.email "gustavo.ueti@yduqs.com.br"
+git config --global user.name "gustavoueti"
+
 # -----------------------------------------------------------------------------
 # Azure CLI
 # -----------------------------------------------------------------------------
@@ -146,7 +157,7 @@ echo "==> Instalando Azure CLI"
 if ! command -v az &> /dev/null; then
   curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 fi
- 
+
 # -----------------------------------------------------------------------------
 # Databricks CLI
 # -----------------------------------------------------------------------------
@@ -154,9 +165,21 @@ echo "==> Instalando Databricks CLI"
 if ! command -v databricks &> /dev/null; then
   curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sudo sh
 fi
- 
+
 # -----------------------------------------------------------------------------
-# ~/.zshrc ó vers„o final, consolidada, sem PATH duplicado
+# LazyGit ‚Äî usado pelo atalho <leader>gg do LunarVim (precisa estar no PATH)
+# -----------------------------------------------------------------------------
+echo "==> Instalando LazyGit"
+if ! command -v lazygit &> /dev/null; then
+  LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+  curl -Lo /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+  tar xf /tmp/lazygit.tar.gz -C /tmp lazygit
+  sudo install /tmp/lazygit /usr/local/bin
+  rm /tmp/lazygit.tar.gz /tmp/lazygit
+fi
+
+# -----------------------------------------------------------------------------
+# ~/.zshrc ‚Äî vers√£o final, consolidada, sem PATH duplicado
 # -----------------------------------------------------------------------------
 echo "==> Escrevendo ~/.zshrc"
 cat > "$HOME/.zshrc" << 'ZSHRC_EOF'
@@ -165,52 +188,52 @@ cat > "$HOME/.zshrc" << 'ZSHRC_EOF'
 # =============================================================================
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME=""
- 
+
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
- 
+
 source $ZSH/oh-my-zsh.sh
- 
+
 # =============================================================================
-# PATH (consolidado ó uma ˙nica linha, ordem importa: primeiro tem prioridade)
+# PATH (consolidado ‚Äî uma √∫nica linha, ordem importa: primeiro tem prioridade)
 # =============================================================================
 export PATH="$HOME/.local/bin:$HOME/bin:$HOME/.asdf/shims:$HOME/.cargo/bin:$PATH"
- 
+
 # =============================================================================
 # asdf
 # =============================================================================
 export ASDF_DATA_DIR="$HOME/.asdf"
 . <(asdf completion zsh)
- 
+
 # =============================================================================
 # Starship
 # =============================================================================
 eval "$(starship init zsh)"
- 
+
 # =============================================================================
-# Aliases ó eza
+# Aliases ‚Äî eza
 # =============================================================================
 alias ls='eza --icons'
 alias ll='eza -l --icons --git'
 alias la='eza -la --icons --git'
 alias lt='eza --tree --icons --level=2'
- 
+
 # =============================================================================
-# Aliases ó bat
+# Aliases ‚Äî bat
 # =============================================================================
 alias cat='batcat'
 alias bat='batcat'
 ZSHRC_EOF
- 
+
 # -----------------------------------------------------------------------------
-# ~/.config/starship.toml ó Tokyo Night Moon + Databricks (nf-fae-hexagon) + Azure
+# ~/.config/starship.toml ‚Äî Tokyo Night Moon + Databricks (nf-fae-hexagon) + Azure
 # -----------------------------------------------------------------------------
 echo "==> Escrevendo ~/.config/starship.toml"
 mkdir -p "$HOME/.config"
 cat > "$HOME/.config/starship.toml" << 'STARSHIP_EOF'
 # =============================================================================
-# Starship ó Tokyo Night Moon ó Gustavo Ueti (WSL)
+# Starship ‚Äî Tokyo Night Moon ‚Äî Gustavo Ueti (WSL)
 # =============================================================================
- 
+
 format = """
 [](fg:bg_dark)\
 $os\
@@ -224,13 +247,14 @@ $git_status\
 $custom\
 $azure\
 [](fg:bg_darker)\
+$python\
 $fill\
 $cmd_duration\
 $line_break\
 $character"""
- 
+
 palette = "tokyo_night_moon"
- 
+
 [palettes.tokyo_night_moon]
 bg_dark    = "#1b1d2b"
 bg_light   = "#2f334d"
@@ -244,51 +268,51 @@ magenta    = "#c099ff"
 cyan       = "#86e1fc"
 orange     = "#ff966c"
 databricks = "#FF6B35"
- 
+
 [os]
 style = "bg:bg_dark fg:fg"
 disabled = false
- 
+
 [os.symbols]
-Ubuntu = "??"
- 
+Ubuntu = "Û∞ïà"
+
 [username]
 show_always = true
 style_user = "bg:bg_dark fg:fg"
 style_root = "bg:bg_dark fg:red"
 format = '[ $user ]($style)'
- 
+
 [directory]
 style = "bg:bg_light fg:cyan"
-format = "[ ?? $path ]($style)"
+format = "[ Û∞âã $path ]($style)"
 truncation_length = 0
 truncate_to_repo = false
- 
+
 [git_branch]
 style = "bg:bg_dark fg:cyan"
 format = '[ $symbol$branch ]($style)'
 symbol = " "
- 
+
 [git_status]
 style = "bg:bg_dark fg:yellow"
 format = '[$all_status$ahead_behind ]($style)'
- 
+
 [fill]
 symbol = " "
- 
+
 [cmd_duration]
 style = "bg:bg_darker fg:yellow"
-format = "[ ?? $duration ]($style)"
+format = "[ Û±é´ $duration ]($style)"
 min_time = 2000
- 
+
 [character]
-success_symbol = "[?](bold green)"
-error_symbol = "[?](bold red)"
-vimcmd_symbol = "[?](bold yellow)"
- 
+success_symbol = "[‚ùØ](bold green)"
+error_symbol = "[‚ùØ](bold red)"
+vimcmd_symbol = "[‚ùÆ](bold yellow)"
+
 # ----------------------------------------------------------------------------
-# Databricks ó lÍ o(s) profile(s) configurados em ~/.databrickscfg
-# Funciona com o formato novo do CLI (seÁıes [profile_name], sem default_profile)
+# Databricks ‚Äî l√™ o(s) profile(s) configurados em ~/.databrickscfg
+# Funciona com o formato novo do CLI (se√ß√µes [profile_name], sem default_profile)
 # ----------------------------------------------------------------------------
 [custom.databricks]
 command = "grep -oP '(?<=^\\[)[^\\]]+(?=\\]$)' ~/.databrickscfg 2>/dev/null | grep -v -E '^(DEFAULT|__settings__)$' | tail -1"
@@ -296,35 +320,48 @@ when = "test -f ~/.databrickscfg"
 style = "bg:bg_darker fg:databricks"
 format = '[  $output ]($style)'
 shell = ["bash", "--norc"]
- 
+
 # ----------------------------------------------------------------------------
 # Azure
 # ----------------------------------------------------------------------------
 [azure]
 disabled = false
-format = '[ ?? $subscription ]($style)'
+format = '[ Û∞†Ö $subscription ]($style)'
 style = "bg:bg_darker fg:blue"
+
+# ----------------------------------------------------------------------------
+# Python ‚Äî mostra o nome do venv ativo entre par√™nteses, em verde
+# (precisa de $python referenciado no format principal l√° em cima, sen√£o
+#  o m√≥dulo fica configurado mas nunca √© chamado)
+# ----------------------------------------------------------------------------
+[python]
+disabled = false
+format = '[(\($virtualenv\) )]($style)'
+style = "fg:green"
+detect_extensions = []
+detect_files = []
+detect_folders = []
 STARSHIP_EOF
- 
+
 # -----------------------------------------------------------------------------
-# Limpeza de resÌduos conhecidos do asdf
+# Limpeza de res√≠duos conhecidos do asdf
 # O repo asdf-plugins (plugin-index) traz um .tool-versions de CI interno que,
-# se ficar l·, pode confundir a resoluÁ„o de vers„o do asdf exec.
+# se ficar l√°, pode confundir a resolu√ß√£o de vers√£o do asdf exec.
 # -----------------------------------------------------------------------------
-echo "==> Limpando .tool-versions Ûrf„o do asdf plugin-index (se existir)"
+echo "==> Limpando .tool-versions √≥rf√£o do asdf plugin-index (se existir)"
 rm -f "$HOME/.asdf/plugin-index/.tool-versions"
- 
+
 # -----------------------------------------------------------------------------
-# Trocar shell padr„o para zsh
+# Trocar shell padr√£o para zsh
 # -----------------------------------------------------------------------------
-echo "==> Trocando shell padr„o para zsh"
+echo "==> Trocando shell padr√£o para zsh"
 if [ "$SHELL" != "$(which zsh)" ]; then
   sudo chsh -s "$(which zsh)" "$USER"
 fi
- 
+
 echo ""
 echo "==================================================================="
-echo " InstalaÁ„o concluÌda!"
+echo " Instala√ß√£o conclu√≠da!"
 echo ""
 echo " Passos manuais restantes (fora do WSL, lado Windows):"
 echo " 1. Instalar uma Nerd Font (ex: JetBrainsMono Nerd Font) no Windows"
@@ -336,7 +373,14 @@ echo "    - Setar 'font.face': 'JetBrainsMono Nerd Font' no perfil do WSL"
 echo "    - Setar 'defaultProfile' com o guid do perfil do WSL"
 echo "    - (Opcional) keybindings ctrl+shift+c / ctrl+shift+v para copy/paste"
 echo ""
-echo " AutenticaÁıes pendentes:"
+echo " ~/.config/lvim/config.lua (editar manualmente):"
+echo "    - vim.g.clipboard = wl-clipboard (copy/paste --type STRING, n√£o"
+echo "      text/plain ‚Äî o WSLg entrega o clipboard do Windows como STRING)"
+echo "    - vim.opt.clipboard = 'unnamedplus'"
+echo "    - lvim.builtin.illuminate.active = false (bug conhecido em paste"
+echo "      grande + treesitter nessa combina√ß√£o de vers√µes)"
+echo ""
+echo " Autentica√ß√µes pendentes:"
 echo " 3. databricks auth login --host https://<workspace>.azuredatabricks.net"
 echo " 4. az login"
 echo ""
