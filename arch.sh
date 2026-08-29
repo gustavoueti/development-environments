@@ -317,7 +317,7 @@ style  = "Italic"
 
 [window]
 padding = { x = 8, y = 8 }
-opacity = 0.98
+opacity = 1.0
 
 # --- keybindings ------------------------------------------------------------
 # Shift+Return envia ESC + CR (útil p/ apps que distinguem nova linha de enter)

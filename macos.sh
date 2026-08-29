@@ -269,7 +269,7 @@ shell zsh
 include tokyo-night.conf
 
 hide_window_decorations titlebar-only
-background_opacity 0.97
+background_opacity 1.0
 
 enabled_layouts splits
 
