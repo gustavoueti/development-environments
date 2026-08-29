@@ -8,7 +8,7 @@
 #   ./arch.sh
 #
 # Alinhado 1:1 com o wsl2-ubuntu.sh no que diz respeito a shell, prompt, tmux
-# e tooling (Starship + Tokyo Night Moon, ~/.tmux.conf, eza, bat, LunarVim,
+# e tooling (Starship + Tokyo Night Moon, ~/.tmux.conf, eza, bat, NvChad,
 # LazyGit, Rust, nvm + asdf 2.x). Mantém os extras específicos do Arch:
 # Alacritty, Firefox, Google Cloud SDK, AWS CLI e Nerd Fonts via pacman.
 #
@@ -26,7 +26,7 @@ sudo pacman -Syu --noconfirm
 
 echo "==> Instalando dependências base"
 sudo pacman -S --noconfirm --needed \
-  base-devel git curl wget unzip gpg jq \
+  base-devel git curl wget unzip gnupg jq \
   xclip wl-clipboard dos2unix \
   python-pip npm
 
@@ -85,8 +85,9 @@ echo "==> Instalando tmux"
 sudo pacman -S --noconfirm --needed tmux
 
 # -----------------------------------------------------------------------------
-# Rust (rustup) — usado por plugins do LunarVim (telescope-fzf-native, etc)
-# e por ferramentas de formatação/busca que rodam via cargo install.
+# Rust (rustup) — usado por ferramentas de formatação/busca que rodam via
+# cargo install e por plugins de Neovim que compilam via cargo (se você
+# adicionar algum, ex: telescope-fzf-native com build em rust).
 # -----------------------------------------------------------------------------
 echo "==> Instalando Rust via rustup"
 sudo pacman -S --noconfirm --needed rustup
@@ -95,27 +96,33 @@ if ! rustup toolchain list 2>/dev/null | grep -q '^stable'; then
 fi
 source "$HOME/.cargo/env" 2>/dev/null || export PATH="$HOME/.cargo/bin:$PATH"
 
-# fd + ripgrep: usados pelo Telescope (fuzzy finder) do LunarVim para busca de
+# fd + ripgrep: usados pelo Telescope (fuzzy finder) do NvChad para busca de
 # arquivos/texto. No Arch vêm dos repos oficiais (mais rápido que cargo install).
 echo "==> Instalando fd e ripgrep"
 sudo pacman -S --noconfirm --needed fd ripgrep
 
 # -----------------------------------------------------------------------------
-# Neovim + LunarVim
+# Neovim — pacote do pacman (rolling). O NvChad exige Neovim >= 0.11, então
+# não faz mais sentido fixar 0.10.x como era necessário pro LunarVim.
+# Também remove um pin antigo em /opt + symlink em /usr/local/bin, se existir.
 # -----------------------------------------------------------------------------
-echo "==> Instalando Neovim"
+echo "==> Instalando Neovim (pacman)"
 sudo pacman -S --noconfirm --needed neovim
+[ -L /usr/local/bin/nvim ] && sudo rm -f /usr/local/bin/nvim
+[ -d /opt/nvim-linux-x86_64 ] && sudo rm -rf /opt/nvim-linux-x86_64
+true  # não deixa o resultado do teste acima abortar o set -e
 
-NVIM_VERSION=$(nvim --version | head -1 | grep -oP '\d+\.\d+' | head -1)
+NVIM_VERSION=$(nvim --version | head -1 | grep -oP '\d+\.\d+\.\d+' | head -1)
 echo "    Neovim version: $NVIM_VERSION"
-
-echo "==> Instalando LunarVim"
-if ! command -v lvim &> /dev/null; then
-  LV_BRANCH='release-1.4/neovim-0.9' bash <(curl -s https://raw.githubusercontent.com/lunarvim/lunarvim/release-1.4/neovim-0.9/utils/installer/install.sh) --yes
-fi
 
 # -----------------------------------------------------------------------------
 # asdf (version manager) — instalado como binário Go (formato atual, 2.x+)
+#
+# Vem antes do Neovim/NvChad de propósito: com os runtimes do asdf no PATH
+# (pip do venv do asdf + npm com prefixo no diretório do próprio asdf) dá pra
+# instalar pacotes globais de node/python sem esbarrar nas travas do Arch:
+#   - pip: externally-managed-environment (PEP 668)
+#   - npm: EACCES, prefixo global em /usr sem permissão
 # -----------------------------------------------------------------------------
 echo "==> Instalando asdf"
 if [ ! -f "$HOME/bin/asdf" ]; then
@@ -138,6 +145,62 @@ asdf install nodejs "$NODEJS_VERSION"
 asdf set -u python "$PYTHON_VERSION"
 asdf set -u nodejs "$NODEJS_VERSION"
 
+# Coloca os shims do asdf no PATH da sessão atual do script — sem isso o resto
+# do script continua enxergando o python/npm do pacman.
+export PATH="$ASDF_DATA_DIR/shims:$PATH"
+asdf reshim python 2>/dev/null || true
+asdf reshim nodejs 2>/dev/null || true
+
+# -----------------------------------------------------------------------------
+# LunarVim — remove instalação antiga (substituído pelo NvChad)
+# -----------------------------------------------------------------------------
+echo "==> Removendo LunarVim (se existir)"
+rm -rf "$HOME/.local/share/lunarvim" "$HOME/.local/state/lunarvim" \
+       "$HOME/.config/lvim" "$HOME/.cache/lvim" "$HOME/.local/bin/lvim"
+
+# -----------------------------------------------------------------------------
+# NvChad (starter) + plugins
+#
+# Clona o starter em ~/.config/nvim e remove o .git pra você versionar do seu
+# jeito. Plugins extras ficam em lua/plugins/*.lua — o lazy.nvim importa a
+# pasta inteira ({ import = "plugins" } no init). nvim-tree (<C-n>) e telescope
+# já vêm habilitados no NvChad por padrão.
+# -----------------------------------------------------------------------------
+echo "==> Instalando NvChad"
+if [ ! -f "$HOME/.config/nvim/init.lua" ]; then
+  if [ -e "$HOME/.config/nvim" ]; then
+    mv "$HOME/.config/nvim" "$HOME/.config/nvim.bak.$(date +%s)"
+  fi
+  git clone https://github.com/NvChad/starter "$HOME/.config/nvim"
+  rm -rf "$HOME/.config/nvim/.git"
+fi
+
+echo "==> Escrevendo plugins extras do NvChad (lua/plugins/)"
+mkdir -p "$HOME/.config/nvim/lua/plugins"
+cat > "$HOME/.config/nvim/lua/plugins/lazygit.lua" << 'NVPLUG_EOF'
+return {
+  -- LazyGit dentro do nvim: <leader>gg  (precisa do binário lazygit no PATH)
+  {
+    "kdheepak/lazygit.nvim",
+    cmd = { "LazyGit", "LazyGitConfig", "LazyGitCurrentFile", "LazyGitFilter", "LazyGitFilterCurrentFile" },
+    dependencies = { "nvim-lua/plenary.nvim" },
+    keys = {
+      { "<leader>gg", "<cmd>LazyGit<cr>", desc = "LazyGit" },
+    },
+  },
+}
+NVPLUG_EOF
+
+# clipboard do sistema (xclip / wl-clipboard já instalados acima)
+if ! grep -q 'vim.opt.clipboard' "$HOME/.config/nvim/lua/options.lua" 2>/dev/null; then
+  printf '\nvim.opt.clipboard = "unnamedplus"\n' >> "$HOME/.config/nvim/lua/options.lua"
+fi
+
+echo "==> Sincronizando plugins do NvChad (headless)"
+nvim --headless "+Lazy! sync" +qa 2>/dev/null || true
+nvim --headless "+MasonInstallAll" +qa 2>/dev/null || true
+asdf reshim nodejs 2>/dev/null || true
+
 # -----------------------------------------------------------------------------
 # nvm — coexiste com o asdf. Alguns projetos (SWA CLI / front) esperam um node
 # gerenciado por nvm; o asdf continua sendo o default via ~/.tool-versions.
@@ -151,10 +214,18 @@ fi
 
 # -----------------------------------------------------------------------------
 # Git Credential Manager (GCM)
+#
+# Usa o pacote -bin (tarball oficial do GitHub releases). O pacote que compila
+# do fonte (git-credential-manager) quebra no Arch atual: o GCM 2.9.1 é feito
+# pro .NET 8, e o SDK do dotnet no repo já é o 10 — o restore do NuGet falha
+# ("project.assets.json already exists" / workloads). O -bin não precisa de
+# dotnet SDK nenhum.
 # -----------------------------------------------------------------------------
 echo "==> Instalando Git Credential Manager"
 if ! command -v git-credential-manager &> /dev/null; then
-  yay -S --noconfirm git-credential-manager
+  # limpa build quebrado de tentativa anterior do pacote que compila do fonte
+  rm -rf "$HOME/.cache/yay/git-credential-manager"
+  yay -S --noconfirm git-credential-manager-bin
   git-credential-manager configure
 fi
 # 'plaintext' grava a credencial em ~/.git-credentials (protegido só por chmod).
@@ -203,7 +274,7 @@ if ! command -v databricks &> /dev/null; then
 fi
 
 # -----------------------------------------------------------------------------
-# LazyGit — usado pelo atalho <leader>gg do LunarVim (precisa estar no PATH)
+# LazyGit — binário no PATH; o NvChad chama via lazygit.nvim (<leader>gg)
 # -----------------------------------------------------------------------------
 echo "==> Instalando LazyGit"
 sudo pacman -S --noconfirm --needed lazygit
@@ -247,6 +318,13 @@ style  = "Italic"
 [window]
 padding = { x = 8, y = 8 }
 opacity = 0.98
+
+# --- keybindings ------------------------------------------------------------
+# Shift+Return envia ESC + CR (útil p/ apps que distinguem nova linha de enter)
+[[keyboard.bindings]]
+key = "Return"
+mods = "Shift"
+chars = "\u001B\r"
 
 # --- Tokyo Night Moon --------------------------------------------------------
 [colors.primary]
@@ -492,6 +570,12 @@ cat > "$HOME/.tmux.conf" << 'TMUX_EOF'
 # tmux — Gustavo Ueti (Arch)
 # =============================================================================
 
+# --- shell dos panes: zsh -------------------------------------------------
+# Sem isso o tmux herda o shell de quem subiu o servidor (normalmente
+# /bin/bash), e aí zsh-syntax-highlighting / autosuggestions / starship
+# não aparecem dentro do tmux.
+set -g default-shell /usr/bin/zsh
+
 # --- prefixo: Ctrl+b -> Ctrl+a -----------------------------------------------
 unbind C-b
 set -g prefix C-a
@@ -553,22 +637,6 @@ bind r source-file ~/.tmux.conf \; display "~/.tmux.conf recarregado"
 TMUX_EOF
 
 # -----------------------------------------------------------------------------
-# ~/.config/lvim/config.lua — clipboard nativo (xclip/wl-clipboard auto) +
-# workaround do illuminate (bug em paste grande + treesitter nessas versões).
-# Só escreve se o LunarVim já tiver criado o diretório de config.
-# -----------------------------------------------------------------------------
-if [ -d "$HOME/.config/lvim" ]; then
-  echo "==> Escrevendo ~/.config/lvim/config.lua"
-  cat > "$HOME/.config/lvim/config.lua" << 'LVIM_EOF'
--- Read the docs: https://www.lunarvim.org/docs/configuration
-
-vim.opt.clipboard = "unnamedplus"
-
-lvim.builtin.illuminate.active = false
-LVIM_EOF
-fi
-
-# -----------------------------------------------------------------------------
 # Limpeza de resíduos conhecidos do asdf
 # O repo asdf-plugins (plugin-index) traz um .tool-versions de CI interno que,
 # se ficar lá, pode confundir a resolução de versão do asdf exec.
@@ -589,6 +657,10 @@ echo "==================================================================="
 echo " Instalação concluída!"
 echo ""
 echo " Abra o Alacritty — a fonte JetBrainsMono Nerd Font já está configurada."
+echo ""
+echo " Neovim: NvChad. O primeiro start termina de baixar os plugins."
+echo "    <C-n> abre o file explorer (nvim-tree), <leader>gg abre o LazyGit."
+echo "    Se algum LSP faltar: :MasonInstallAll dentro do nvim."
 echo ""
 echo " Versões default do asdf (ajuste com 'asdf set -u <tool> <versao>'):"
 echo "    - python 3.14.0"
