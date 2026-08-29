@@ -645,6 +645,32 @@ echo "==> Limpando .tool-versions órfão do asdf plugin-index (se existir)"
 rm -f "$HOME/.asdf/plugin-index/.tool-versions"
 
 # -----------------------------------------------------------------------------
+# zram — swap comprimido em RAM (metade da RAM, zstd)
+#
+# Numa máquina com pouca RAM isso é o que evita o "trava tudo" quando a memória
+# enche: em vez de mandar páginas frias pro /swapfile no SSD (lento), o kernel
+# comprime e guarda na própria RAM. O zram entra com prioridade acima do
+# /swapfile, que fica só como rede de segurança.
+# -----------------------------------------------------------------------------
+echo "==> Configurando zram"
+sudo pacman -S --noconfirm --needed zram-generator
+sudo tee /etc/systemd/zram-generator.conf >/dev/null << 'ZRAM_EOF'
+[zram0]
+zram-size = min(ram / 2, 4096)
+compression-algorithm = zstd
+ZRAM_EOF
+sudo tee /etc/sysctl.d/99-zram.conf >/dev/null << 'ZRAM_SYSCTL_EOF'
+# tuning para swap em zram (latência baixíssima — pode swappar agressivo)
+vm.swappiness = 180
+vm.watermark_boost_factor = 0
+vm.watermark_scale_factor = 125
+vm.page-cluster = 0
+ZRAM_SYSCTL_EOF
+sudo systemctl daemon-reload
+sudo systemctl restart systemd-zram-setup@zram0.service 2>/dev/null || true
+sudo sysctl --system >/dev/null
+
+# -----------------------------------------------------------------------------
 # Trocar shell padrão para zsh
 # -----------------------------------------------------------------------------
 echo "==> Trocando shell padrão para zsh"
