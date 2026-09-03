@@ -16,8 +16,11 @@
 # Diferenças de WSL2 em relação ao arch.sh:
 #   - clipboard: wl-clipboard via WSLg (entrega o clipboard do Windows como
 #     STRING, não text/plain) — usado no zsh, tmux e Neovim
-#   - Git Credential Manager: 'plaintext' obrigatório (secretservice/dpapi
-#     exigem GUI Linux ou Windows nativo, não funcionam no WSL)
+#   - Git Credential Manager: usa o GCM do Git for Windows (lado Windows) via
+#     wrapper de shell no credential.helper — credenciais no Windows Credential
+#     Manager, compartilhadas entre os dois lados. Sem GCM nativo no Linux
+#     (secretservice/dpapi exigem GUI Linux ou Windows nativo; sobraria só
+#     'plaintext').
 #   - sem zram / sysctl de swap (isso é papel do .wslconfig no Windows)
 #   - sem Alacritty / Firefox / ttf-*-nerd
 #
@@ -237,26 +240,48 @@ if [ ! -d "$HOME/.nvm" ]; then
 fi
 
 # -----------------------------------------------------------------------------
-# Git Credential Manager (GCM)
+# Git Credential Manager — via GCM do Git for Windows (lado Windows)
 #
-# Usa o pacote -bin (tarball oficial do GitHub releases). O pacote que compila
-# do fonte (git-credential-manager) quebra no Arch atual: o GCM 2.9.1 é feito
-# pro .NET 8, e o SDK do dotnet no repo já é o 10 — o restore do NuGet falha.
-# O -bin não precisa de dotnet SDK nenhum.
+# No WSL2 o GCM nativo do Linux não tem onde guardar credencial com segurança
+# ('secretservice'/'dpapi' exigem GUI Linux ou Windows nativo; sobraria só
+# 'plaintext', em ~/.git-credentials protegido apenas por chmod). Em vez disso
+# reaproveitamos o GCM que já vem com o Git for Windows: as credenciais ficam
+# no Windows Credential Manager e são compartilhadas entre os dois lados.
+#
+# Pré-requisito (lado Windows, uma vez):
+#   winget install --id Git.Git -e --source winget
+#
+# Por que um wrapper de shell e não o .exe direto no credential.helper:
+# o git-credential-manager.exe roda como processo Windows e, no arranque,
+# procura 'git.exe' no PATH. Lançado a partir do WSL ele não acha e estoura
+# "Failed to locate 'git.exe' executable on the path" — e aí o Git cai no
+# prompt manual de usuário, mascarando o erro. Exportar o PATH no ~/.zshrc não
+# resolve: a entrada não chega traduzida ao processo Windows. O wrapper monta
+# o PATH no instante exato em que o Git invoca o helper.
+#
+# Validação: só funciona quando o Git chama o helper (git clone de repo
+# privado). Rodar '...\git-credential-manager.exe --version' direto continua
+# estourando a mesma exception mesmo com tudo certo.
+# Debug: GIT_TRACE=1 mostra a linha de comando; GCM_TRACE precisa de
+# WSLENV=GCM_TRACE:$WSLENV pra atravessar pro Windows.
 # -----------------------------------------------------------------------------
-echo "==> Instalando Git Credential Manager"
-if ! command -v git-credential-manager &> /dev/null; then
-  # limpa build quebrado de tentativa anterior do pacote que compila do fonte
-  rm -rf "$HOME/.cache/yay/git-credential-manager"
-  yay -S --noconfirm git-credential-manager-bin
-  git-credential-manager configure
+echo "==> Configurando Git Credential Manager (GCM do Windows)"
+GCM_WIN_EXE="/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"
+GIT_WIN_CMD="/mnt/c/Program Files/Git/cmd"
+if [ -x "$GCM_WIN_EXE" ]; then
+  git config --global credential.helper \
+    "!f() { PATH=\"\$PATH:$GIT_WIN_CMD\" \"$GCM_WIN_EXE\" \"\$@\"; }; f"
+else
+  echo "    ⚠  não encontrei $GCM_WIN_EXE"
+  echo "       instale o Git for Windows no lado Windows e rode de novo:"
+  echo "       winget install --id Git.Git -e --source winget"
 fi
-# No WSL 'secretservice' e 'dpapi' NÃO funcionam (exigem GUI Linux ou Windows
-# nativo). 'plaintext' grava a credencial em ~/.git-credentials (protegido só
-# por chmod), sem reautenticar depois do primeiro login.
-git config --global credential.credentialStore plaintext
-# Azure DevOps: cada repo/org precisa da credencial casada com o path completo
+
+# Azure DevOps: a credencial precisa casar com o path completo da URL.
+#   - host novo:   dev.azure.com/<org>
+#   - host legado: arquiteturaestacio.visualstudio.com (URL antiga)
 git config --global credential."https://dev.azure.com".useHttpPath true
+git config --global credential."https://arquiteturaestacio.visualstudio.com".useHttpPath true
 
 # -----------------------------------------------------------------------------
 # Git — identidade global
@@ -384,6 +409,11 @@ export NVM_DIR="$HOME/.nvm"
 # nvm joga o próprio node no início do PATH ao carregar, escondendo o shim do
 # asdf — reafirma a prioridade do asdf.
 export PATH="$HOME/.asdf/shims:$PATH"
+
+# NÃO adicionar '/mnt/c/Program Files/Git/cmd' ao PATH aqui: entrada de PATH do
+# WSL não chega traduzida ao processo Windows do GCM, então não resolve nada. O
+# credential.helper (git config) já é um wrapper que monta esse PATH na hora da
+# chamada.
 ZSHRC_EOF
 
 # -----------------------------------------------------------------------------
@@ -602,14 +632,17 @@ echo "==================================================================="
 echo " Instalação concluída!"
 echo ""
 echo " Passos manuais restantes (lado Windows):"
-echo " 1. Instalar uma Nerd Font (ex: JetBrainsMono Nerd Font) no Windows"
+echo " 1. Instalar o Git for Windows (traz o GCM usado pelo credential.helper):"
+echo "    winget install --id Git.Git -e --source winget"
+echo "    Depois, no WSL, validar com um 'git clone' de repo privado."
+echo " 2. Instalar uma Nerd Font (ex: JetBrainsMono Nerd Font) no Windows"
 echo "    https://www.nerdfonts.com/font-downloads"
-echo " 2. No Windows Terminal settings.json:"
+echo " 3. No Windows Terminal settings.json:"
 echo "    - Adicionar o color scheme 'Tokyo Night Moon'"
 echo "    - Setar 'colorScheme': 'Tokyo Night Moon' no perfil do WSL"
 echo "    - Setar 'font.face': 'JetBrainsMono Nerd Font' no perfil do WSL"
 echo "    - Setar 'defaultProfile' com o guid do perfil do WSL"
-echo " 3. (Opcional) limitar RAM/CPU do WSL no %USERPROFILE%\\.wslconfig"
+echo " 4. (Opcional) limitar RAM/CPU do WSL no %USERPROFILE%\\.wslconfig"
 echo ""
 echo " Versões default do asdf (ajuste com 'asdf set -u <tool> <versao>'):"
 echo "    - python 3.14.0"
